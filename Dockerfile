@@ -6,4 +6,4 @@ COPY src ./src
 
 RUN mvn package -DskipTests
 
-CMD ["java", "-jar", "/app/iptv-server-1.0-SNAPSHOT.jar", "--spring.profiles.active=prod"]
+CMD ["java", "-jar", "/app/target/iptv-server-1.0-SNAPSHOT.jar", "--spring.profiles.active=prod"]
