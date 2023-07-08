@@ -1,0 +1,14 @@
+server:
+  port: 9999
+spring:
+  application:
+    name: springboot-iptv-server
+  cloud:
+    gateway:
+      routes:
+        - id: default-route
+          uri: https://www.baidu.com/
+          predicates:
+            - Path=/iptv
+iptv:
+  server-config-url: https://gitee.com/ambitiousjun/iptv-test/raw/master/iptv-servers.yml
