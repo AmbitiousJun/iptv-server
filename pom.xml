@@ -21,6 +21,11 @@
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+    </dependency>
+
     <!-- https://mvnrepository.com/artifact/org.yaml/snakeyaml -->
     <dependency>
       <groupId>org.yaml</groupId>

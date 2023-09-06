@@ -2,10 +2,10 @@ package com.ambitious.iptvserver.filter;
 
 import cn.hutool.core.util.StrUtil;
 import com.ambitious.iptvserver.config.IptvConfig;
+import com.ambitious.iptvserver.entity.ServerInfo;
+import com.ambitious.iptvserver.job.service.ServerTest;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -16,7 +16,6 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Resource;
-import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
@@ -31,6 +30,8 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
 
     @Resource
     private OkHttpClient httpClient;
+    @Resource(name = "simpleServerTest")
+    private ServerTest serverTest;
     private String tvName;
 
     @Override
@@ -42,7 +43,7 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
             return parseError(response);
         }
         // 2 尝试获取直播源列表
-        List<String> servers = IptvConfig.getServers(type);
+        List<ServerInfo> servers = IptvConfig.getServers(type);
         if (servers == null || servers.isEmpty()) {
             return parseError(response);
         }
@@ -63,17 +64,12 @@ public class MyGlobalFilter implements GlobalFilter, Ordered {
      * @param servers 直播源列表
      * @return 可用的地址，如果都不可用，返回空
      */
-    private String getAvailableServer(List<String> servers) {
-        for (String server : servers) {
-            Request request = new Request.Builder()
-                    .url(server)
-                    .get()
-                    .build();
-            try (Response response = httpClient.newCall(request).execute()) {
-                if (response.isSuccessful() && response.code() == 200) {
-                    return server;
-                }
-            } catch (IOException e) {
+    private String getAvailableServer(List<ServerInfo> servers) {
+        for (ServerInfo serverInfo : servers) {
+            String server = serverInfo.getUrl();
+            if (serverTest.test(server)) {
+                return server;
+            } else {
                 log.error("电视台：{}，直播源：{}，不可用", this.tvName, server);
             }
         }

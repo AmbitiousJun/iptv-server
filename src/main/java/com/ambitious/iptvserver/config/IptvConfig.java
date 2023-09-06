@@ -1,6 +1,8 @@
 package com.ambitious.iptvserver.config;
 
+import com.ambitious.iptvserver.entity.ServerInfo;
 import com.ambitious.iptvserver.util.CastUtils;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -15,8 +17,11 @@ import org.yaml.snakeyaml.Yaml;
 
 import javax.annotation.Resource;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 处理 Iptv 相关配置
@@ -35,14 +40,34 @@ public class IptvConfig implements InitializingBean {
     private String serverConfigUrl;
     @Resource
     private OkHttpClient httpClient;
-    private static final Map<String, List<String>> SERVERS_MAP = Maps.newHashMap();
+    private static final Map<String, List<ServerInfo>> SERVERS_MAP = Maps.newHashMap();
+
+    /**
+     * 依据直播源评分重新排序
+     * @param tvKey 直播源 key
+     */
+    public static void reSort(String tvKey) {
+        List<ServerInfo> servers = getServers(tvKey);
+        if (servers == null || servers.isEmpty()) {
+            return;
+        }
+        servers.sort((s1, s2) -> s2.getSuccessRate().compareTo(s1.getSuccessRate()));
+    }
+
+    /**
+     * 获取当前服务器中配置的所有直播源 key
+     * @return 所有 key
+     */
+    public static List<String> getAllTypes() {
+        return Lists.newArrayList(SERVERS_MAP.keySet());
+    }
 
     /**
      * 根据电视台名称从 SERVERS_MAP 中获取对应电视台的直播源列表
      * @param tvName 电视台名称
      * @return 直播源列表，如果不存在该电视台的配置，就返回空
      */
-    public static List<String> getServers(String tvName) {
+    public static List<ServerInfo> getServers(String tvName) {
         return SERVERS_MAP.get(tvName);
     }
 
@@ -69,7 +94,7 @@ public class IptvConfig implements InitializingBean {
             if (servers == null || servers.isEmpty()) {
                 throw new RuntimeException(errorMsgPrefix + "电视台 " + tvName + " 的直播源数据列表为空");
             }
-            SERVERS_MAP.put(tvName, servers);
+            SERVERS_MAP.put(tvName, servers.stream().map(ServerInfo::new).collect(Collectors.toList()));
         }
         log.info("远程配置文件转换成功");
         log.info(SERVERS_MAP.toString());

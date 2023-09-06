@@ -12,3 +12,4 @@ spring:
             - Path=/iptv
 iptv:
   server-config-url: https://gitee.com/ambitiousjun/iptv-test/raw/master/iptv-servers.yml
+os: mac
