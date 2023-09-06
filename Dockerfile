@@ -4,6 +4,7 @@ WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 COPY ffmpeg ./ffmpeg
+COPY maven-settings.xml /root/.m2/settings.xml
 
 RUN mvn package -DskipTests
 
