@@ -36,7 +36,7 @@ public class FfmpegServerTest implements ServerTest {
             String line = bf.readLine();
             while (StrUtil.isNotEmpty(line)) {
                 Matcher m = pattern.matcher(line);
-                if (m.matches() && url.equals(m.group(2))) {
+                if (m.matches()) {
                     return true;
                 }
                 line = bf.readLine();
