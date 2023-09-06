@@ -28,9 +28,7 @@ import java.util.List;
 @Slf4j
 public class MyGlobalFilter implements GlobalFilter, Ordered {
 
-    @Resource
-    private OkHttpClient httpClient;
-    @Resource(name = "simpleServerTest")
+    @Resource(name = "ffmpegServerTest")
     private ServerTest serverTest;
     private String tvName;
 

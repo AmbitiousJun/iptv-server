@@ -44,7 +44,7 @@ public class ServerScoringJob {
     private ServerTest serverTest;
 
     @Scheduled(fixedRate = 30, timeUnit = TimeUnit.MINUTES)
-    public void doJob() throws InterruptedException {
+    public void doJob() {
         log.info("开始更新直播源的评分...");
         List<String> tvKeys = IptvConfig.getAllTypes();
         for (String tvKey : tvKeys) {
@@ -53,7 +53,6 @@ public class ServerScoringJob {
             for (ServerInfo serverInfo : servers) {
                 // 测试是否能够成功连接
                 serverInfo.addRecord(serverTest.test(serverInfo.getUrl()));
-                Thread.sleep(1000);
             }
             IptvConfig.reSort(tvKey);
             printTvScore(tvKey);
@@ -69,7 +68,8 @@ public class ServerScoringJob {
         System.out.println("====== tvKey: " + tvKey + " ↓ ======");
         List<ServerInfo> servers = IptvConfig.getServers(tvKey);
         for (ServerInfo serverInfo : servers) {
-            System.out.printf("== [score]: %.2f [url]: %s ==\n", serverInfo.getSuccessRate(), serverInfo.getUrl());
+            int score = (int) Math.ceil(serverInfo.getSuccessRate() * 100);
+            System.out.printf("== [score]: %d [url]: %s ==\n", score, serverInfo.getUrl());
         }
         System.out.println("====== tvKey: " + tvKey + " ↑ ======");
     }
