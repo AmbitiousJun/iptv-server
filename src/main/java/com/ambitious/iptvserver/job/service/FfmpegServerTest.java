@@ -30,18 +30,21 @@ public class FfmpegServerTest implements ServerTest {
         // 2 调用 ffmpeg-mac，分析直播源的可用性
         ProcessBuilder pb = new ProcessBuilder("./ffmpeg/ffmpeg-" + os, "-i", url);
         pb.redirectErrorStream(true);
+        log.info("ffmpeg url: {}", url);
         try {
             Process p = pb.start();
             BufferedReader bf = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = bf.readLine();
             while (StrUtil.isNotEmpty(line)) {
                 Matcher m = pattern.matcher(line);
-                if (m.matches()) {
+                if (m.matches() && url.equals(m.group(2))) {
                     return true;
                 }
+                log.info(line);
                 line = bf.readLine();
             }
             p.waitFor();
+            log.info("ffmpeg url: {}", url);
         } catch (Exception e) {
             log.error("调用 ffmpeg 异常：{}", e.getMessage());
             return false;
