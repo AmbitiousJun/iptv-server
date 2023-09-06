@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
@@ -30,6 +32,10 @@ public class ServerScoringJob {
      * 时间格式化
      */
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    /**
+     * 时区
+     */
+    private static final ZoneId ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     /**
      * 直播源连通性测试
@@ -51,7 +57,7 @@ public class ServerScoringJob {
             IptvConfig.reSort(tvKey);
             printTvScore(tvKey);
         }
-        log.info("直播源评分更新完成，下次更新时间：" + FORMATTER.format(LocalDateTime.now().plusMinutes(30)));
+        log.info("直播源评分更新完成，下次更新时间：" + FORMATTER.format(ZonedDateTime.now(ZONE_ID).toLocalDateTime().plusMinutes(30)));
     }
 
     /**

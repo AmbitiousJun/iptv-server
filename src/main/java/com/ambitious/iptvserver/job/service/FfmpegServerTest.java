@@ -1,6 +1,7 @@
 package com.ambitious.iptvserver.job.service;
 
 import cn.hutool.core.util.StrUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ import java.util.regex.Pattern;
  * @date 2023/9/6
  */
 @Service
+@Slf4j
 public class FfmpegServerTest implements ServerTest {
 
     @Value("${os}")
@@ -41,6 +43,7 @@ public class FfmpegServerTest implements ServerTest {
             }
             p.waitFor();
         } catch (Exception e) {
+            log.error("调用 ffmpeg 异常：{}", e.getMessage());
             return false;
         }
         return false;
