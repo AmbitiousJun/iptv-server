@@ -5,7 +5,6 @@ import com.ambitious.iptvserver.config.IptvConfig;
 import com.ambitious.iptvserver.entity.ServerInfo;
 import com.ambitious.iptvserver.job.service.ServerTest;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.OkHttpClient;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -20,13 +19,13 @@ import java.net.URI;
 import java.util.List;
 
 /**
- * 全局过滤器
+ * 过滤 iptv 源
  * @author ambitious
  * @date 2023/7/8
  */
 @Component
 @Slf4j
-public class MyGlobalFilter implements GlobalFilter, Ordered {
+public class IptvFilter implements GlobalFilter, Ordered {
 
     @Resource(name = "ffmpegServerTest")
     private ServerTest serverTest;

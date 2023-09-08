@@ -4,6 +4,7 @@ import com.ambitious.iptvserver.entity.ServerInfo;
 import com.ambitious.iptvserver.util.CastUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
@@ -21,6 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 /**
@@ -40,7 +44,23 @@ public class IptvConfig implements InitializingBean {
     private String serverConfigUrl;
     @Resource
     private OkHttpClient httpClient;
-    private static final Map<String, List<ServerInfo>> SERVERS_MAP = Maps.newHashMap();
+    private static Map<String, List<ServerInfo>> SERVERS_MAP = Maps.newHashMap();
+    /**
+     * 用于刷新直播源数据时进行线程同步
+     */
+    public static final ReentrantReadWriteLock SERVERS_LOCK = new ReentrantReadWriteLock();
+
+    /**
+     * 获取一个读取直播源的读锁
+     * @return 读锁
+     */
+    public static Lock getServersReadLock() {
+        return SERVERS_LOCK.readLock();
+    }
+
+    public static Lock getServersWriteLock() {
+        return SERVERS_LOCK.writeLock();
+    }
 
     /**
      * 依据直播源评分重新排序
@@ -59,7 +79,13 @@ public class IptvConfig implements InitializingBean {
      * @return 所有 key
      */
     public static List<String> getAllTypes() {
-        return Lists.newArrayList(SERVERS_MAP.keySet());
+        Lock lock = getServersReadLock();
+        lock.lock();
+        try {
+            return Lists.newArrayList(SERVERS_MAP.keySet());
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
@@ -68,16 +94,63 @@ public class IptvConfig implements InitializingBean {
      * @return 直播源列表，如果不存在该电视台的配置，就返回空
      */
     public static List<ServerInfo> getServers(String tvName) {
-        return SERVERS_MAP.get(tvName);
+        Lock lock = getServersReadLock();
+        lock.lock();
+        try {
+            return SERVERS_MAP.get(tvName);
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
      * 读取远程的 yml 配置文件，将数据源预处理成一个 HashMap
      */
     @Override
-    public void afterPropertiesSet() throws Exception {
+    public void afterPropertiesSet() {
         Map<String, Object> rawMap = readConfigAsMap();
         formatServersMap(rawMap);
+    }
+
+    /**
+     * 刷新直播源数据
+     * @return 是否刷新成功
+     */
+    public boolean refreshServers() {
+        if (SERVERS_LOCK.getReadLockCount() > 0) {
+            return false;
+        }
+        Lock lock = getServersWriteLock();
+        lock.lock();
+        try {
+            Map<String, List<ServerInfo>> oldMap = SERVERS_MAP;
+            SERVERS_MAP = Maps.newHashMap();
+            formatServersMap(readConfigAsMap());
+            // 对比 newMap，如果 oldMap 中存在一样的直播源，则拷贝得分数据
+            for (String tvKey : SERVERS_MAP.keySet()) {
+                if (!oldMap.containsKey(tvKey)) {
+                    continue;
+                }
+                Set<ServerInfo> olds = Sets.newHashSet(oldMap.get(tvKey));
+                Map<String, List<ServerInfo>> oldUrlMap = oldMap.get(tvKey).stream().collect(Collectors.groupingBy(ServerInfo::getUrl));
+                List<ServerInfo> newServers = SERVERS_MAP.get(tvKey);
+                for (ServerInfo newServer : newServers) {
+                    if (olds.contains(newServer)) {
+                        String url = newServer.getUrl();
+                        ServerInfo oldInfo = oldUrlMap.get(url).get(0);
+                        newServer.setRequestSuccessNum(oldInfo.getRequestSuccessNum());
+                        newServer.setSuccessRate(oldInfo.getSuccessRate());
+                        newServer.setRequestTotalNum(oldInfo.getRequestTotalNum());
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("更新直播源数据失败：{}", e.getMessage());
+            return false;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**

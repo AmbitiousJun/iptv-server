@@ -7,9 +7,13 @@ spring:
     gateway:
       routes:
         - id: default-route
-          uri: https://www.baidu.com/
+          uri: https://blog.ambitiousjun.cn
           predicates:
             - Path=/iptv
+        - id: refresh-route
+          uri: https://blog.ambitiousjun.cn
+          predicates:
+            - Path=/iptv-refresh
 iptv:
   server-config-url: https://gitee.com/ambitiousjun/iptv-test/raw/master/iptv-servers.yml
 os: mac

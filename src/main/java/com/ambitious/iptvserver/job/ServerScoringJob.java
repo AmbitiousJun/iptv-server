@@ -8,14 +8,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 
 /**
  * 每隔 30 分钟就对所有直播源进行一次请求，
@@ -45,19 +43,25 @@ public class ServerScoringJob {
 
     @Scheduled(fixedRate = 30, timeUnit = TimeUnit.MINUTES)
     public void doJob() {
-        log.info("开始更新直播源的评分...");
-        List<String> tvKeys = IptvConfig.getAllTypes();
-        for (String tvKey : tvKeys) {
-            // 拿到电视台的所有直播源
-            List<ServerInfo> servers = IptvConfig.getServers(tvKey);
-            for (ServerInfo serverInfo : servers) {
-                // 测试是否能够成功连接
-                serverInfo.addRecord(serverTest.test(serverInfo.getUrl()));
+        Lock lock = IptvConfig.getServersReadLock();
+        lock.lock();
+        try {
+            log.info("开始更新直播源的评分...");
+            List<String> tvKeys = IptvConfig.getAllTypes();
+            for (String tvKey : tvKeys) {
+                // 拿到电视台的所有直播源
+                List<ServerInfo> servers = IptvConfig.getServers(tvKey);
+                for (ServerInfo serverInfo : servers) {
+                    // 测试是否能够成功连接
+                    serverInfo.addRecord(serverTest.test(serverInfo.getUrl()));
+                }
+                IptvConfig.reSort(tvKey);
+                printTvScore(tvKey);
             }
-            IptvConfig.reSort(tvKey);
-            printTvScore(tvKey);
+            log.info("直播源评分更新完成，下次更新时间：" + FORMATTER.format(ZonedDateTime.now(ZONE_ID).toLocalDateTime().plusMinutes(30)));
+        } finally {
+            lock.unlock();
         }
-        log.info("直播源评分更新完成，下次更新时间：" + FORMATTER.format(ZonedDateTime.now(ZONE_ID).toLocalDateTime().plusMinutes(30)));
     }
 
     /**

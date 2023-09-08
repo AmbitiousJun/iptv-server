@@ -1,5 +1,6 @@
 package com.ambitious.iptvserver.entity;
 
+import cn.hutool.core.util.StrUtil;
 import lombok.Data;
 
 /**
@@ -44,5 +45,18 @@ public class ServerInfo {
         }
         requestTotalNum++;
         successRate = requestSuccessNum / requestTotalNum;
+    }
+
+    @Override
+    public int hashCode() {
+        return this.url.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object another) {
+        if (!(another instanceof ServerInfo) || StrUtil.isEmpty(this.url)) {
+            return false;
+        }
+        return this.url.equals(((ServerInfo) another).getUrl());
     }
 }
