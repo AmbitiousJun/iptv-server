@@ -15,5 +15,5 @@ spring:
           predicates:
             - Path=/iptv-refresh
 iptv:
-  server-config-url: https://gitee.com/ambitiousjun/iptv-test/raw/master/iptv-servers.yml
+  server-config-url: https://example.com/iptv-server.yml
 os: mac
