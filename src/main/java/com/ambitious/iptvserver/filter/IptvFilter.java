@@ -4,7 +4,12 @@ import cn.hutool.core.util.StrUtil;
 import com.ambitious.iptvserver.config.IptvConfig;
 import com.ambitious.iptvserver.entity.ServerInfo;
 import com.ambitious.iptvserver.job.service.ServerTest;
+import kotlin.Pair;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.Headers;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -50,9 +55,43 @@ public class IptvFilter implements GlobalFilter, Ordered {
         if (StrUtil.isEmpty(server)) {
             return parseError(response);
         }
+        // 4 执行代理
+        if (IptvConfig.checkNeedProxy(server)) {
+            return proxyUrl(response, server);
+        }
         response.setStatusCode(HttpStatus.FOUND);
         response.getHeaders().setLocation(URI.create(server));
         return response.setComplete();
+    }
+
+    /**
+     * 代理直播源
+     * @param response 当前请求的响应对象
+     * @param url 要代理的直播源地址
+     */
+    private Mono<Void> proxyUrl(ServerHttpResponse response, String url) {
+        // 1 代理请求，获取 m3u8
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .headers(Headers.of(IptvConfig.getProxyHeaders(url)))
+                .build();
+        try (Response resp = client.newCall(request).execute()) {
+            // 2 响应请求
+            response.setStatusCode(HttpStatus.resolve(resp.code()));
+            for (Pair<? extends String, ? extends String> header : resp.headers()) {
+                response.getHeaders().set(header.getFirst(), header.getSecond());
+            }
+            if (resp.body() == null) {
+                throw new RuntimeException("proxy request body is empty");
+            }
+            return response.writeWith(Mono.just(response.bufferFactory().wrap(resp.body().bytes())));
+        } catch (Exception e) {
+            response.setStatusCode(HttpStatus.FOUND);
+            response.getHeaders().setLocation(URI.create(url));
+            return response.setComplete();
+        }
     }
 
     /**
@@ -64,7 +103,8 @@ public class IptvFilter implements GlobalFilter, Ordered {
     private String getAvailableServer(List<ServerInfo> servers) {
         for (ServerInfo serverInfo : servers) {
             String server = serverInfo.getUrl();
-            if (serverTest.test(server)) {
+            // 如果是需要代理的直播源，默认可用
+            if (IptvConfig.checkNeedProxy(server) || serverTest.test(server)) {
                 return server;
             } else {
                 log.error("电视台：{}，直播源：{}，不可用", this.tvName, server);

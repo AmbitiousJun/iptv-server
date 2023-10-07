@@ -52,8 +52,13 @@ public class ServerScoringJob {
                 // 拿到电视台的所有直播源
                 List<ServerInfo> servers = IptvConfig.getServers(tvKey);
                 for (ServerInfo serverInfo : servers) {
-                    // 测试是否能够成功连接
-                    serverInfo.addRecord(serverTest.test(serverInfo.getUrl()));
+                    // 如果是需要进行代理的直播源，就不进行测试
+                    if (IptvConfig.checkNeedProxy(serverInfo.getUrl())) {
+                        serverInfo.addRecord(true);
+                    } else {
+                        // 测试是否能够成功连接
+                        serverInfo.addRecord(serverTest.test(serverInfo.getUrl()));
+                    }
                 }
                 IptvConfig.reSort(tvKey);
                 printTvScore(tvKey);

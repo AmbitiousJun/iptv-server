@@ -1,6 +1,7 @@
 package com.ambitious.iptvserver.config;
 
 import com.ambitious.iptvserver.entity.ServerInfo;
+import com.ambitious.iptvserver.entity.ServerProxy;
 import com.ambitious.iptvserver.util.CastUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -25,6 +26,8 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +45,22 @@ public class IptvConfig implements InitializingBean {
      * 远程的 iptv 服务器列表配置链接
      */
     private String serverConfigUrl;
+    /**
+     * 直播源代理配置
+     */
+    private List<ServerProxy> proxies;
+    /**
+     * 静态的直播源代理配置
+     */
+    private static List<ServerProxy> staticProxies;
+    /**
+     * 需要代理的直播源 host
+     */
+    private static Set<String> proxyHosts;
+    /**
+     * 用于匹配出 url 中的主机名的正则表达式
+     */
+    private static final Pattern PROXY_HOST_PATTERN = Pattern.compile("https?://([^/]+)");
     @Resource
     private OkHttpClient httpClient;
     private static Map<String, List<ServerInfo>> SERVERS_MAP = Maps.newHashMap();
@@ -110,6 +129,56 @@ public class IptvConfig implements InitializingBean {
     public void afterPropertiesSet() {
         Map<String, Object> rawMap = readConfigAsMap();
         formatServersMap(rawMap);
+        initProxyHosts();
+        staticProxies = this.proxies;
+    }
+
+    /**
+     * 获取一个直播源的代理请求头
+     * @param url url
+     */
+    public static Map<String, String> getProxyHeaders(String url) {
+        Map<String, String> res = Maps.newHashMap();
+        for (ServerProxy serverProxy : staticProxies) {
+            String host = serverProxy.getHost();
+            Matcher matcher = PROXY_HOST_PATTERN.matcher(url);
+            if (!matcher.find() || !matcher.group(1).equals(host)) {
+                continue;
+            }
+            List<String> headers = serverProxy.getHeaders();
+            for (String header : headers) {
+                String[] kvs = header.split("\\|");
+                if (kvs.length != 2) {
+                    throw new RuntimeException("代理请求头配置错误：" + header + "，请使用 | 分割 key value");
+                }
+                res.put(kvs[0], kvs[1]);
+            }
+        }
+        return res;
+    }
+
+    /**
+     * 检查某个直播源是否需要本地代理
+     * @param url url
+     * @return 是否需要代理
+     */
+    public static boolean checkNeedProxy(String url) {
+        // 解析主机名
+        Matcher matcher = PROXY_HOST_PATTERN.matcher(url);
+        if (matcher.find()) {
+            return proxyHosts.contains(matcher.group(1));
+        }
+        return proxyHosts.contains(url);
+    }
+
+    /**
+     * 初始化需要进行代理的直播源主机集合
+     */
+    private void initProxyHosts() {
+        proxyHosts = Sets.newHashSet();
+        for (ServerProxy serverProxy : proxies) {
+            proxyHosts.add(serverProxy.getHost());
+        }
     }
 
     /**
