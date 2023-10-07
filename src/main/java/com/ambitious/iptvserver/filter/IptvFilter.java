@@ -14,14 +14,17 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Resource;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 过滤 iptv 源
@@ -83,6 +86,8 @@ public class IptvFilter implements GlobalFilter, Ordered {
             for (Pair<? extends String, ? extends String> header : resp.headers()) {
                 response.getHeaders().set(header.getFirst(), header.getSecond());
             }
+            response.getHeaders().add("Transfer-Encoding", "chunked");
+            response.getHeaders().add("Connection", "keep-alive");
             if (resp.body() == null) {
                 throw new RuntimeException("proxy request body is empty");
             }
