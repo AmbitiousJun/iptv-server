@@ -84,10 +84,11 @@ public class IptvFilter implements GlobalFilter, Ordered {
             // 2 响应请求
             response.setStatusCode(HttpStatus.resolve(resp.code()));
             for (Pair<? extends String, ? extends String> header : resp.headers()) {
+                if ("Access-Control-Allow-Origin".equals(header.getFirst())) {
+                    continue;
+                }
                 response.getHeaders().set(header.getFirst(), header.getSecond());
             }
-            response.getHeaders().add("Transfer-Encoding", "chunked");
-            response.getHeaders().add("Connection", "keep-alive");
             if (resp.body() == null) {
                 throw new RuntimeException("proxy request body is empty");
             }
