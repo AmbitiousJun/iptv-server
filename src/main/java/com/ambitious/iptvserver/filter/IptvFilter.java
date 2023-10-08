@@ -1,6 +1,10 @@
 package com.ambitious.iptvserver.filter;
 
+import cn.hutool.core.net.url.UrlBuilder;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
+import cn.hutool.http.Method;
 import com.ambitious.iptvserver.config.IptvConfig;
 import com.ambitious.iptvserver.entity.ServerInfo;
 import com.ambitious.iptvserver.job.service.ServerTest;
@@ -66,7 +70,7 @@ public class IptvFilter implements GlobalFilter, Ordered {
         }
         // 4 执行代理
         if (IptvConfig.checkNeedProxy(server)) {
-            return proxyUrl(exchange, server);
+            return proxyUrl(response, server);
         }
         response.setStatusCode(HttpStatus.FOUND);
         response.getHeaders().setLocation(URI.create(server));
@@ -108,26 +112,29 @@ public class IptvFilter implements GlobalFilter, Ordered {
      */
     private Mono<Void> proxyUrl(ServerHttpResponse response, String url) {
         // 1 代理请求，获取 m3u8
-        OkHttpClient client = new OkHttpClient();
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .headers(Headers.of(IptvConfig.getProxyHeaders(url)))
-                .build();
-        try (Response resp = client.newCall(request).execute()) {
+        HttpRequest request = new HttpRequest(UrlBuilder.of(url));
+        request.addHeaders(IptvConfig.getProxyHeaders(url));
+        request.method(Method.GET);
+        try (HttpResponse resp = request.execute()) {
             // 2 响应请求
-            response.setStatusCode(HttpStatus.resolve(resp.code()));
-            for (Pair<? extends String, ? extends String> header : resp.headers()) {
-                if ("Access-Control-Allow-Origin".equals(header.getFirst())) {
-                    continue;
+            if (resp.getStatus() == cn.hutool.http.HttpStatus.HTTP_OK) {
+                response.setStatusCode(HttpStatus.resolve(resp.getStatus()));
+                for (String key : resp.headers().keySet()) {
+                    if (StrUtil.isEmpty(key)) {
+                        continue;
+                    }
+                    for (String value : resp.headers().get(key)) {
+                        response.getHeaders().add(key, value);
+                    }
                 }
-                response.getHeaders().set(header.getFirst(), header.getSecond());
+                if (resp.body() == null) {
+                    throw new RuntimeException("proxy request body is empty");
+                }
+                return response.writeAndFlushWith(Mono.just(Mono.just(response.bufferFactory().wrap(resp.bodyBytes()))));
             }
-            if (resp.body() == null) {
-                throw new RuntimeException("proxy request body is empty");
-            }
-            return response.writeWith(Mono.just(response.bufferFactory().wrap(resp.body().bytes())));
+            throw new RuntimeException("请求失败: " + resp.getStatus() + " " + resp.body());
         } catch (Exception e) {
+            log.error("代理 url 失败：{}", e.getMessage());
             response.setStatusCode(HttpStatus.FOUND);
             response.getHeaders().setLocation(URI.create(url));
             return response.setComplete();
