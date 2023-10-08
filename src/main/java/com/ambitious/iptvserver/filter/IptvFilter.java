@@ -12,11 +12,17 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.cloud.gateway.filter.factory.rewrite.CachedBodyOutputMessage;
 import org.springframework.core.Ordered;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyExtractors;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -60,11 +66,38 @@ public class IptvFilter implements GlobalFilter, Ordered {
         }
         // 4 执行代理
         if (IptvConfig.checkNeedProxy(server)) {
-            return proxyUrl(response, server);
+            return proxyUrl(exchange, server);
         }
         response.setStatusCode(HttpStatus.FOUND);
         response.getHeaders().setLocation(URI.create(server));
         return response.setComplete();
+    }
+
+    private Mono<Void> proxyUrl(ServerWebExchange exchange, String url) {
+        WebClient client = WebClient.create();
+        ServerHttpResponse response = exchange.getResponse();
+        return client.method(HttpMethod.GET)
+                .uri(URI.create(url))
+                .headers(headers -> {
+                    Map<String, String> proxyHeaders = IptvConfig.getProxyHeaders(url);
+                    for (String key : proxyHeaders.keySet()) {
+                        headers.add(key, proxyHeaders.get(key));
+                    }
+                })
+                .exchangeToMono(resp -> {
+                    if (resp.statusCode().is2xxSuccessful()) {
+                        HttpHeaders respHeaders = resp.headers().asHttpHeaders();
+                        HttpStatus statusCode = resp.statusCode();
+                        response.setStatusCode(statusCode);
+                        response.getHeaders().addAll(respHeaders);
+                        return resp.bodyToMono(DataBuffer.class)
+                                .flatMap(dataBuffer -> response.writeAndFlushWith(Mono.just(Mono.just(dataBuffer))));
+                    } else {
+                        response.setStatusCode(HttpStatus.FOUND);
+                        response.getHeaders().setLocation(URI.create(url));
+                        return response.setComplete();
+                    }
+                });
     }
 
     /**
