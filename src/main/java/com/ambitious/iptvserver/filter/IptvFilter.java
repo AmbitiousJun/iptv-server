@@ -115,7 +115,8 @@ public class IptvFilter implements GlobalFilter, Ordered {
         HttpRequest request = new HttpRequest(UrlBuilder.of(url));
         request.addHeaders(IptvConfig.getProxyHeaders(url));
         request.method(Method.GET);
-        try (HttpResponse resp = request.execute()) {
+        HttpResponse resp = request.execute();
+        try {
             // 2 响应请求
             if (resp.getStatus() == cn.hutool.http.HttpStatus.HTTP_OK) {
                 response.setStatusCode(HttpStatus.resolve(resp.getStatus()));
@@ -138,6 +139,10 @@ public class IptvFilter implements GlobalFilter, Ordered {
             response.setStatusCode(HttpStatus.FOUND);
             response.getHeaders().setLocation(URI.create(url));
             return response.setComplete();
+        } finally {
+            if (resp != null) {
+                resp.close();
+            }
         }
     }
 
