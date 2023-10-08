@@ -12,6 +12,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.view.RedirectView;
 
 import javax.annotation.Resource;
@@ -68,8 +70,7 @@ public class IptvController {
     }
 
     @GetMapping("/iptv/proxy")
-    @ResponseBody
-    public String proxyIptv(@RequestParam String url, HttpServletResponse response) throws IOException {
+    public ResponseEntity<byte[]> proxyIptv(@RequestParam String url) throws IOException {
         if (StrUtil.isEmpty(url)) {
             throw new RuntimeException("url 为空");
         }
@@ -86,13 +87,17 @@ public class IptvController {
             if (code != HttpStatus.OK.value()) {
                 throw new RuntimeException("请求失败");
             }
-            for (Pair<? extends String, ? extends String> pair : resp.headers()) {
-                response.setHeader(pair.getFirst(), pair.getSecond());
-            }
             if (resp.body() == null) {
                 throw new RuntimeException("请求失败");
             }
-            return new String(resp.body().bytes());
+            return ResponseEntity
+                    .status(code)
+                    .headers(headers -> {
+                        for (Pair<? extends String, ? extends String> pair : resp.headers()) {
+                            headers.add(pair.getFirst(), pair.getSecond());
+                        }
+                    })
+                    .body(resp.body().bytes());
         }
     }
 
