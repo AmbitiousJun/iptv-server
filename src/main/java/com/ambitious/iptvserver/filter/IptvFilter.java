@@ -90,8 +90,9 @@ public class IptvFilter implements GlobalFilter, Ordered {
                         HttpStatus statusCode = resp.statusCode();
                         response.setStatusCode(statusCode);
                         response.getHeaders().addAll(respHeaders);
-                        return resp.bodyToMono(DataBuffer.class)
-                                .flatMap(dataBuffer -> response.writeAndFlushWith(Mono.just(Mono.just(dataBuffer))));
+                        // return resp.bodyToMono(DataBuffer.class)
+                        //         .flatMap(dataBuffer -> response.writeAndFlushWith(Mono.just(Mono.just(dataBuffer))));
+                        return response.writeAndFlushWith(Mono.just(resp.body(BodyExtractors.toDataBuffers())));
                     } else {
                         response.setStatusCode(HttpStatus.FOUND);
                         response.getHeaders().setLocation(URI.create(url));
