@@ -22,7 +22,7 @@ import java.util.concurrent.locks.Lock;
  * @author ambitious
  * @date 2023/9/6
  */
-@Component
+// @Component
 @Slf4j
 public class ServerScoringJob {
 
