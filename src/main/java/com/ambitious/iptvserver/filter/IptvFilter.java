@@ -115,8 +115,7 @@ public class IptvFilter implements GlobalFilter, Ordered {
         HttpRequest request = new HttpRequest(UrlBuilder.of(url));
         request.addHeaders(IptvConfig.getProxyHeaders(url));
         request.method(Method.GET);
-        HttpResponse resp = request.execute();
-        try {
+        try (HttpResponse resp = request.execute()) {
             // 2 响应请求
             if (resp.getStatus() == cn.hutool.http.HttpStatus.HTTP_OK) {
                 response.setStatusCode(HttpStatus.resolve(resp.getStatus()));
@@ -131,7 +130,7 @@ public class IptvFilter implements GlobalFilter, Ordered {
                 if (resp.body() == null) {
                     throw new RuntimeException("proxy request body is empty");
                 }
-                return response.writeAndFlushWith(Mono.just(Mono.just(response.bufferFactory().wrap(resp.bodyBytes()))));
+                return response.writeWith(Mono.just(response.bufferFactory().wrap(resp.bodyBytes())));
             }
             throw new RuntimeException("请求失败: " + resp.getStatus() + " " + resp.body());
         } catch (Exception e) {
@@ -139,10 +138,6 @@ public class IptvFilter implements GlobalFilter, Ordered {
             response.setStatusCode(HttpStatus.FOUND);
             response.getHeaders().setLocation(URI.create(url));
             return response.setComplete();
-        } finally {
-            if (resp != null) {
-                resp.close();
-            }
         }
     }
 
