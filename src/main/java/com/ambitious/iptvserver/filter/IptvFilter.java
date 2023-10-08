@@ -32,7 +32,12 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URL;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -70,7 +75,7 @@ public class IptvFilter implements GlobalFilter, Ordered {
         }
         // 4 执行代理
         if (IptvConfig.checkNeedProxy(server)) {
-            return proxyUrl(exchange, server);
+            return proxyUrl(response, server);
         }
         response.setStatusCode(HttpStatus.FOUND);
         response.getHeaders().setLocation(URI.create(server));
@@ -102,27 +107,29 @@ public class IptvFilter implements GlobalFilter, Ordered {
      */
     private Mono<Void> proxyUrl(ServerHttpResponse response, String url) {
         // 1 代理请求，获取 m3u8
-        HttpRequest request = new HttpRequest(UrlBuilder.of(url));
-        request.addHeaders(IptvConfig.getProxyHeaders(url));
-        request.method(Method.GET);
-        try (HttpResponse resp = request.execute()) {
-            // 2 响应请求
-            if (resp.getStatus() == cn.hutool.http.HttpStatus.HTTP_OK) {
-                response.setStatusCode(HttpStatus.resolve(resp.getStatus()));
-                for (String key : resp.headers().keySet()) {
-                    if (StrUtil.isEmpty(key)) {
-                        continue;
-                    }
-                    for (String value : resp.headers().get(key)) {
-                        response.getHeaders().add(key, value);
-                    }
-                }
-                if (resp.body() == null) {
-                    throw new RuntimeException("proxy request body is empty");
-                }
-                return response.writeWith(Mono.just(response.bufferFactory().wrap(resp.bodyBytes())));
+        Map<String, String> proxyHeaders = IptvConfig.getProxyHeaders(url);
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url)
+                .headers(Headers.of(proxyHeaders))
+                .get()
+                .build();
+        try (Response resp = client.newCall(request).execute()) {
+            int code = resp.code();
+            if (code != HttpStatus.OK.value()) {
+                throw new RuntimeException("请求失败");
             }
-            throw new RuntimeException("请求失败: " + resp.getStatus() + " " + resp.body());
+            InputStream inputStream = resp.body().byteStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                bos.write(buffer, 0 , len);
+            }
+            for (Pair<? extends String, ? extends String> pair : resp.headers()) {
+                response.getHeaders().add(pair.getFirst(), pair.getSecond());
+            }
+            return response.writeWith(Mono.just(response.bufferFactory().wrap(bos.toByteArray())));
         } catch (Exception e) {
             log.error("代理 url 失败：{}", e.getMessage());
             response.setStatusCode(HttpStatus.FOUND);
