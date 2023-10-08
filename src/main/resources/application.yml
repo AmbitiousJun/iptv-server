@@ -3,17 +3,6 @@ server:
 spring:
   application:
     name: springboot-iptv-server
-  cloud:
-    gateway:
-      routes:
-        - id: default-route
-          uri: https://blog.ambitiousjun.cn
-          predicates:
-            - Path=/iptv
-        - id: refresh-route
-          uri: https://blog.ambitiousjun.cn
-          predicates:
-            - Path=/iptv-refresh
 iptv:
   server-config-url: https://example.com/iptv-server.yml
   proxies: # 服务器代理请求直播源
