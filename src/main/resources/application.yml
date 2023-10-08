@@ -10,4 +10,7 @@ iptv:
       headers: # 代理请求头
         - origin|https://tingfm.com
         - accept-language|zh-CN,zh;q=0.9
+    - host: us.dispatch.ulivetv.net
+      headers:
+        - referer|https://www.histar.tv/
 os: mac
