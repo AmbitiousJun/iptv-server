@@ -70,7 +70,7 @@ public class IptvFilter implements GlobalFilter, Ordered {
         }
         // 4 执行代理
         if (IptvConfig.checkNeedProxy(server)) {
-            return proxyUrl(response, server);
+            return proxyUrl(exchange, server);
         }
         response.setStatusCode(HttpStatus.FOUND);
         response.getHeaders().setLocation(URI.create(server));
@@ -79,29 +79,19 @@ public class IptvFilter implements GlobalFilter, Ordered {
 
     private Mono<Void> proxyUrl(ServerWebExchange exchange, String url) {
         WebClient client = WebClient.create();
-        ServerHttpResponse response = exchange.getResponse();
-        return client.method(HttpMethod.GET)
+        final Map<String, String> proxyHeaders = IptvConfig.getProxyHeaders(url);
+        return client
+                .method(HttpMethod.GET)
                 .uri(URI.create(url))
                 .headers(headers -> {
-                    Map<String, String> proxyHeaders = IptvConfig.getProxyHeaders(url);
                     for (String key : proxyHeaders.keySet()) {
                         headers.add(key, proxyHeaders.get(key));
                     }
                 })
-                .exchangeToMono(resp -> {
-                    if (resp.statusCode().is2xxSuccessful()) {
-                        HttpHeaders respHeaders = resp.headers().asHttpHeaders();
-                        HttpStatus statusCode = resp.statusCode();
-                        response.setStatusCode(statusCode);
-                        response.getHeaders().addAll(respHeaders);
-                        // return resp.bodyToMono(DataBuffer.class)
-                        //         .flatMap(dataBuffer -> response.writeAndFlushWith(Mono.just(Mono.just(dataBuffer))));
-                        return response.writeAndFlushWith(Mono.just(resp.body(BodyExtractors.toDataBuffers())));
-                    } else {
-                        response.setStatusCode(HttpStatus.FOUND);
-                        response.getHeaders().setLocation(URI.create(url));
-                        return response.setComplete();
-                    }
+                .exchangeToMono(response -> {
+                    exchange.getResponse().getHeaders().addAll(response.headers().asHttpHeaders());
+                    exchange.getResponse().setStatusCode(response.statusCode());
+                    return exchange.getResponse().writeWith(response.bodyToFlux(DataBuffer.class));
                 });
     }
 
