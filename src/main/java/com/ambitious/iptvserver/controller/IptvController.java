@@ -6,10 +6,7 @@ import com.ambitious.iptvserver.entity.ServerInfo;
 import com.ambitious.iptvserver.job.service.ServerTest;
 import kotlin.Pair;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.Headers;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import okhttp3.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -31,8 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author ambitious
@@ -46,6 +42,8 @@ public class IptvController {
     private IptvConfig iptvConfig;
     @Resource(name = "ffmpegServerTest")
     private ServerTest serverTest;
+    @Resource
+    private OkHttpClient httpClient;
 
     @GetMapping("/iptv")
     public String iptv(@RequestParam String type) {
@@ -76,13 +74,12 @@ public class IptvController {
         }
         // 1 代理请求，获取 m3u8
         Map<String, String> proxyHeaders = IptvConfig.getProxyHeaders(url);
-        OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
                 .url(url)
                 .headers(Headers.of(proxyHeaders))
                 .get()
                 .build();
-        try (Response resp = client.newCall(request).execute()) {
+        try (Response resp = httpClient.newCall(request).execute()) {
             int code = resp.code();
             if (code != HttpStatus.OK.value()) {
                 throw new RuntimeException("请求失败");
